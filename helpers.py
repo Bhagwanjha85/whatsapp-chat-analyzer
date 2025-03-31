@@ -3,6 +3,7 @@ from collections import Counter
 from textblob import TextBlob
 import emoji
 import pandas as pd
+
 import plotly.express as px
 from wordcloud import WordCloud
 
@@ -107,6 +108,29 @@ def get_conversation_starters(df):
 # function for most comman words
 
 
+def get_conversation_starters(df):
+    if df.empty:
+        return pd.DataFrame()
+
+    df = df.copy()
+
+    # Handle date conversion errors safely
+    try:
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
+    except Exception as e:
+        print(f"Error converting Date column: {e}")
+        return pd.DataFrame()  # Return empty DataFrame if date conversion fails
+
+    df = df.dropna(subset=['Date'])  # Remove rows where Date conversion failed
+    df = df.sort_values('Date')
+
+    df['date_only'] = df['Date'].dt.date
+    first_messages = df.groupby('date_only')['User'].first().reset_index()
+
+    starter_counts = first_messages['User'].value_counts().reset_index()
+    starter_counts.columns = ['User', 'Count']
+
+    return starter_counts
 
 
 
