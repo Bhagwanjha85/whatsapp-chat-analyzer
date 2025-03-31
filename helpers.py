@@ -4,6 +4,7 @@ from textblob import TextBlob
 import emoji
 import pandas as pd
 import plotly.express as px
+from wordcloud import WordCloud
 
 
 class GraphStyler:
@@ -39,24 +40,30 @@ class GraphStyler:
 def count_words(messages):
     return sum(len(msg.split()) for msg in messages)
 
+
 def detect_offensive_words(messages):
     offensive_words = ["nude", "sex", "fuck", "bitch", "asshole", "porn", "fool", "dick", "boobs", "slut",
                        "madharchod", "nigger", "nigga", "cunt", "pussy", "lund", "lora", "chode", "mc",
                        "ma ka bhosda", "gandmara"]
     return Counter(word.lower() for msg in messages for word in msg.split() if word.lower() in offensive_words)
 
+
 def count_media_messages(messages):
     return sum(1 for msg in messages if "<Media omitted>" in msg)
+
 
 def count_links(messages):
     url_pattern = r'https?://\S+|www\.\S+|\b[a-zA-Z0-9.-]+\.(com|org|net|in|gov|edu|info)\b'
     return sum(1 for msg in messages if re.search(url_pattern, msg))
 
+
 def get_first_message_date(df):
     return df.iloc[0]['Date'] if not df.empty else "N/A"
 
+
 def get_longest_message(messages):
     return max(messages, key=len) if messages.any() else ""
+
 
 def get_sentiment(messages):
     sentiments = {"Positive": 0, "Negative": 0, "Neutral": 0}
@@ -65,12 +72,15 @@ def get_sentiment(messages):
         sentiments["Positive" if polarity > 0 else "Negative" if polarity < 0 else "Neutral"] += 1
     return sentiments
 
+
 def get_top_users(df):
     return df['User'].value_counts().nlargest(5)
+
 
 def extract_emojis(messages):
     all_emojis = [char for msg in messages for char in msg if emoji.is_emoji(char)]
     return Counter(all_emojis)
+
 
 def analyze_active_days(df):
     days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -79,6 +89,7 @@ def analyze_active_days(df):
     total_messages = day_counts.sum()
     day_percentages = (day_counts / total_messages * 100).round(2)
     return day_counts, day_percentages
+
 
 def get_conversation_starters(df):
     if df.empty:
@@ -91,4 +102,11 @@ def get_conversation_starters(df):
     starter_counts = first_messages['User'].value_counts().reset_index()
     starter_counts.columns = ['User', 'Count']
     return starter_counts
+
+
+# function for most comman words
+
+
+
+
 

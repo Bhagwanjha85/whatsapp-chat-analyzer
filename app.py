@@ -1,7 +1,13 @@
 import streamlit as st
+from matplotlib import pyplot as plt
 import preprocessor
 from helpers import *
+import helpers as helper
+import seaborn as sns
+import pandas as pd
 import plotly.express as px
+
+from wordcloud import WordCloud
 
 
 # 🎨 Custom Styles
@@ -23,7 +29,7 @@ st.markdown("""
             border: 2px solid #654ea3;
             margin-bottom: 10px;
         }
-        
+
         div[data-testid="stSidebarNav"] + div {
             position: relative;
             min-height: 90vh;
@@ -43,6 +49,7 @@ st.markdown("""
 # Initialize styler
 styler = GraphStyler()
 
+
 # Streamlit App UI
 def main():
     st.sidebar.title("📊 WhatsApp Chat Analyzer")
@@ -57,7 +64,7 @@ def main():
                     '🙏 App created by Bhagwan Jha\n\n'
                     '📧 Contact: bk.jha.3297@gmail.com\n'
                     '🌐 [GitHub](https://github.com/Bhagwanjha85)'
-                    
+
                     '</div>',
                     unsafe_allow_html=True)
 
@@ -70,9 +77,9 @@ def main():
         else:
             st.warning("⚠️ No messages found in the uploaded file.")
 
+
 def display_analysis(df):
     st.write("### 🔍 Processed Chat Data:")
-    st.dataframe(df)
 
     user_list = ["Overall"] + sorted(df["User"].unique().tolist())
     selected_user = st.sidebar.selectbox("👥 Select a User", user_list)
@@ -84,7 +91,6 @@ def display_analysis(df):
         visualize_data(stats, user_df)
         display_advanced_analysis(user_df)
         st.success("✅ Analysis Complete!")
-
 
 
 def calculate_statistics(user_df, df):
@@ -119,6 +125,7 @@ def display_basic_insights(stats):
     st.markdown(f'<div class="info-box">💬 <b>Longest Message:</b> {stats["Longest Message"]}</div>',
                 unsafe_allow_html=True)
 
+
 def visualize_data(stats, user_df):
     visualize_top_users(stats)
     visualize_sentiment(stats)
@@ -126,11 +133,13 @@ def visualize_data(stats, user_df):
     visualize_emojis(user_df)
     visualize_conversation_starters(stats)
 
+
 def visualize_top_users(stats):
     st.write("### 🏆 Top 5 Active Users")
     fig_users = px.bar(stats["Top Users"], x=stats["Top Users"].index, y=stats["Top Users"].values,
                        labels={'x': 'User', 'y': 'Messages Sent'})
     st.plotly_chart(styler.style_graph(fig_users, "User", "Messages Sent"))
+
 
 def visualize_sentiment(stats):
     st.write("### 📊 Sentiment Analysis")
@@ -138,7 +147,8 @@ def visualize_sentiment(stats):
                            labels={'x': 'Sentiment', 'y': 'Count'})
     st.plotly_chart(styler.style_graph(fig_sentiment, "Sentiment", "Count"))
 
-def visualize_offensive_words(stats):
+
+def visualize_offensive_words(stats, selected_user=None, df=None):
     if stats["Offensive Words"]:
         st.write("### 🚨 Most Used Offensive Words:")
         fig_offensive = px.bar(x=list(stats["Offensive Words"].keys()),
@@ -147,7 +157,6 @@ def visualize_offensive_words(stats):
         st.plotly_chart(styler.style_graph(fig_offensive, "Words", "Count"))
     else:
         st.write("✅ No offensive words detected!")
-
 
 
 def visualize_emojis(user_df):
@@ -178,6 +187,7 @@ def visualize_conversation_starters(stats):
     else:
         st.write("No conversation starters data available.")
 
+
 def display_advanced_analysis(user_df):
     st.write("### 📅 Most Active Days Per Week")
     day_counts, day_percentages = analyze_active_days(user_df)
@@ -190,6 +200,7 @@ def display_advanced_analysis(user_df):
 
     display_daily_distribution(day_counts, day_percentages)
 
+
 def display_heatmap(user_df):
     st.write("#### 🔥 Hourly-Daily Activity Heatmap")
     heatmap_data = user_df.groupby(['day', 'hour']).size().unstack().fillna(0)
@@ -198,12 +209,14 @@ def display_heatmap(user_df):
     fig_heat.update_xaxes(side="top")
     st.plotly_chart(fig_heat)
 
+
 def display_radial_chart(day_counts):
     st.write("#### 🎯 Activity Radial Distribution")
     fig_radial = px.line_polar(day_counts.reset_index(), r=day_counts.values, theta='day',
                                line_close=True, color_discrete_sequence=['#ff6b6b'], template='plotly_dark')
     fig_radial.update_traces(fill='toself')
     st.plotly_chart(fig_radial)
+
 
 def display_daily_distribution(day_counts, day_percentages):
     st.write("#### 📊 Daily Message Distribution")
@@ -213,9 +226,6 @@ def display_daily_distribution(day_counts, day_percentages):
     fig_days.add_scatter(x=day_counts.index, y=day_counts.values, mode='lines+markers',
                          name='Trend', line=dict(color='#38ef7d', width=4))
     st.plotly_chart(styler.style_graph(fig_days, "Day", "Messages"))
-
-
-
 
 
 if __name__ == "__main__":
