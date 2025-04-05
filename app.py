@@ -3,7 +3,6 @@ Main Streamlit application for WhatsApp Chat Analysis
 Handles UI, file upload, and analysis orchestration
 """
 
-
 import streamlit as st
 from matplotlib import pyplot as plt
 import preprocessor
@@ -19,18 +18,22 @@ st.markdown("""
     <style>
         /* Main app background gradient */
         .stApp { 
-            background: linear-gradient(135deg, #654ea3, #eaafc8); 
+            background-image: url('https://xmple.com/wallpaper/highlight-black-red-gradient-linear-3840x2160-c2-000000-8b0000-l-67-a-345-f-21.svg'); 
             color:#ffffff;
+            background-repeat: no-repeat, repeat;
+             background-size: cover;
+             background-position: center;
         }
         /* Sidebar styling with gradient */
         .stSidebar { 
             background: linear-gradient(155deg, #00C9B1, #2A3F5F);
-            color:#9BFF2E;
+            color:white;
+            
         }
         /* Custom info box styling */
         .info-box {
             background-color: #ffffff; 
-            color:#11998e;
+            color:black;
             padding: 15px;
             border-radius: 10px; 
             border: 2px solid #654ea3;
@@ -38,19 +41,38 @@ st.markdown("""
         }
         /* Footer positioning in sidebar */
         .sidebar-footer {
-            position: absolute;
-            color:orange;
-            top:0;
+            position:absolute;
+            top:40px;
             width: 100%;
             margin-top:54%;
+            text-align:center;
             padding: 1rem;
-            background: inherit;
-            border: 2px solid rgba(255, 255, 255, 0.1);
+            background-image: url('https://www.kythelmet.com/bg-world.svg'); 
+            color:#ffffff;
+            background-repeat: no-repeat, repeat;
+            background-size: cover;
+            background-position: center;
+            border-radius:10px;
+            color:gold;
         }
+        .sidebar-footer a{
+         # text-decoration:none;
+         color:white;
+         }
+         
+         
     </style>""", unsafe_allow_html=True)
 
 # Initialize custom graph styler
 styler = GraphStyler()
+
+
+def show_detailed_instructions():
+    """Displays comprehensive instructions that auto-hide when file is uploaded"""
+    st.markdown("""
+    
+    """, unsafe_allow_html=True)
+
 
 
 def main():
@@ -58,26 +80,80 @@ def main():
     Main function that runs the Streamlit app
     Handles file upload and initializes analysis
     """
-    # Sidebar configuration
-    st.sidebar.title("📊 WhatsApp Chat Analyzer")
+
+    # Initialize instructions placeholder
+    instructions_placeholder = st.empty()
+
+    # Show instructions only if no file uploaded
+    if 'uploaded' not in st.session_state:
+        instructions_placeholder.markdown("""
+           <div style='margin-left: 15px;'>
+            <div style='margin: 15px 0;'>
+                <h3 style='color: #00FFFF'>Step 1: Export WhatsApp Chat</h3>
+                <div style='margin-left: 20px;'>
+                    <p><strong>Android/iOS:</strong></p>
+                    <ul>
+                        <li>Open target chat in WhatsApp</li>
+                        <li>Tap ⋮ Menu → More → Export chat</li>
+                        <li>Select <span style='color:orange'>"Without Media"</span> option</li>
+                        <li>Click Ok and <span style='color:#9BFF2E'>"Download the file in your own system"</span> option</li>
+                    </ul>
+                    
+                    
+            </div>
+
+            <div style='margin: 15px 0;'>
+                <h3 style='color: #00FFFF'>Step 2: Upload File</h3>
+                <div style='margin-left: 20px;'>
+                    <ul>
+                        <li>Look for uploader in left sidebar (<span style='color:#eaafc8'>📂 icon</span>)</li>
+                        <li>Select exported .txt file</li>
+                        <li>Wait for file processing (2-10 seconds)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div style='margin: 15px 0;'>
+                <h3 style='color: #00FFFF'>Step 3: Analyze Chat</h3>
+                <div style='margin-left: 20px;'>
+                    <ul>
+                        <li>Select user from dropdown (or "Overall")</li>
+                        <li>Click <span style='color:#38ef7d'>"🔎 Analyze Chat"</span> button</li>
+                        <li>Scroll to explore visualizations:
+                            <ul>
+                                <li>📈 Message statistics</li>
+                                <li>😀 Emoji usage</li>
+                                <li>📅 Activity patterns</li>
+                                <li>📊 Sentiment analysis</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.sidebar.title("WHATSAPP CHAT ANALYZER")
+    # File processing and analysis trigger
     uploaded_file = st.sidebar.file_uploader("📂 Upload your WhatsApp Chat (.txt)", type=["txt"])
 
     # Sidebar footer with creator information
     with st.sidebar:
         st.markdown("---")
         st.markdown('<div class="sidebar-footer">'
-                    '🙏 App created by Bhagwan Jha\n\n'
-                    '📧 Contact: bk.jha.3297@gmail.com\n'
-                    '🌐 [GitHub](https://github.com/Bhagwanjha85)</div>',
+                    '© Bhagwan Jha @ 2025-26 \n\n'
+                    '(https://github.com/Bhagwanjha85)</div>',
                     unsafe_allow_html=True)
-
-    # File processing and analysis trigger
     if uploaded_file:
+        # Clear instructions when file is uploaded
+        instructions_placeholder.empty()
+        st.session_state.uploaded = True
+
+        # Rest of your processing code
         data = uploaded_file.getvalue().decode("utf-8")
-        df = preprocessor.preprocess(data)  # Process raw chat data
+        df = preprocessor.preprocess(data)
 
         if not df.empty:
-            display_analysis(df)  # Start analysis workflow
+            display_analysis(df)
         else:
             st.warning("⚠️ No messages found in the uploaded file.")
 
@@ -234,8 +310,7 @@ def visualize_conversation_starters(stats):
     else:
         st.write("No conversation starters data available.")
 
-
-
+# to display the Most Active Days Per Week according to hrs. and days .
 def display_advanced_analysis(user_df):
     st.write("### 📅 Most Active Days Per Week")
     day_counts, day_percentages = analyze_active_days(user_df)

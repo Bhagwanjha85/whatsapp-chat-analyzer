@@ -3,7 +3,6 @@ Helper functions for data processing and visualization
 Contains statistical calculations and graph styling logic
 """
 
-
 import re
 from collections import Counter
 from textblob import TextBlob
@@ -125,8 +124,6 @@ def get_conversation_starters(df):
     starter_counts.columns = ['User', 'Count']
     return starter_counts
 
-
-# function for most comman words
 
 def get_conversation_starters(df):
     if df.empty:
