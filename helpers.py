@@ -1,11 +1,21 @@
+"""
+Helper functions for data processing and visualization
+Contains statistical calculations and graph styling logic
+"""
+
+
 import re
 from collections import Counter
 from textblob import TextBlob
 import emoji
 import pandas as pd
-
 import plotly.express as px
 from wordcloud import WordCloud
+
+
+# Add Last Message Date to Statistics:
+def get_last_message_date(df):
+    return df.iloc[-1]['Date'] if not df.empty else "N/A"
 
 
 class GraphStyler:
@@ -36,18 +46,19 @@ class GraphStyler:
         )
         return fig
 
-
-# Message analysis functions
 def count_words(messages):
+    """Calculates total word count across all messages"""
     return sum(len(msg.split()) for msg in messages)
 
-
 def detect_offensive_words(messages):
+    """
+    Detects and counts predefined offensive words
+    Returns Counter object with word frequencies
+    """
     offensive_words = ["nude", "sex", "fuck", "bitch", "asshole", "porn", "fool", "dick", "boobs", "slut",
                        "madharchod", "nigger", "nigga", "cunt", "pussy", "lund", "lora", "chode", "mc",
-                       "ma ka bhosda", "gandmara"]
+                       "ma ka bhosda", "gandmara", "fuckyou", "fuck you", "laude"]
     return Counter(word.lower() for msg in messages for word in msg.split() if word.lower() in offensive_words)
-
 
 def count_media_messages(messages):
     return sum(1 for msg in messages if "<Media omitted>" in msg)
@@ -84,11 +95,21 @@ def extract_emojis(messages):
 
 
 def analyze_active_days(df):
-    days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    df['day'] = pd.Categorical(df['day'], categories=days_order, ordered=True)
-    day_counts = df['day'].value_counts().sort_index()
+    """Ensure complete day coverage with zero-filled missing days"""
+    days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday',
+                  'Friday', 'Saturday', 'Sunday']
+
+    # Count messages per day
+    day_counts = df['day'].value_counts()
+
+    # Create complete index with all days
+    day_counts = day_counts.reindex(days_order, fill_value=0)
+
+    # Calculate percentages
     total_messages = day_counts.sum()
-    day_percentages = (day_counts / total_messages * 100).round(2)
+    day_percentages = (day_counts / total_messages * 100).round(2) if total_messages > 0 \
+        else pd.Series([0] * 7, index=days_order)
+
     return day_counts, day_percentages
 
 
@@ -107,21 +128,19 @@ def get_conversation_starters(df):
 
 # function for most comman words
 
-
 def get_conversation_starters(df):
     if df.empty:
         return pd.DataFrame()
 
     df = df.copy()
 
-    # Handle date conversion errors safely
     try:
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
     except Exception as e:
-        print(f"Error converting Date column: {e}")
-        return pd.DataFrame()  # Return empty DataFrame if date conversion fails
+        print(f"Date conversion error: {e}")
+        return pd.DataFrame()
 
-    df = df.dropna(subset=['Date'])  # Remove rows where Date conversion failed
+    df = df.dropna(subset=['Date'])
     df = df.sort_values('Date')
 
     df['date_only'] = df['Date'].dt.date
@@ -130,7 +149,13 @@ def get_conversation_starters(df):
     starter_counts = first_messages['User'].value_counts().reset_index()
     starter_counts.columns = ['User', 'Count']
 
+    # Extract temporal features
+    df["year"] = df["Date-Time"].dt.year
+    df["month"] = df["Date-Time"].dt.month_name()
+    df["day"] = df["Date-Time"].dt.day_name()
+
+    # Add proper categorical ordering for days
+    days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday',
+                  'Friday', 'Saturday', 'Sunday']
+    df['day'] = pd.Categorical(df['day'], categories=days_order, ordered=True)
     return starter_counts
-
-
-

@@ -1,3 +1,9 @@
+"""
+Main Streamlit application for WhatsApp Chat Analysis
+Handles UI, file upload, and analysis orchestration
+"""
+
+
 import streamlit as st
 from matplotlib import pyplot as plt
 import preprocessor
@@ -6,21 +12,22 @@ import helpers as helper
 import seaborn as sns
 import pandas as pd
 import plotly.express as px
-
 from wordcloud import WordCloud
 
-
-# 🎨 Custom Styles
+# 🎨 Custom CSS styles for the application
 st.markdown("""
     <style>
+        /* Main app background gradient */
         .stApp { 
             background: linear-gradient(135deg, #654ea3, #eaafc8); 
             color:#ffffff;
         }
+        /* Sidebar styling with gradient */
         .stSidebar { 
             background: linear-gradient(155deg, #00C9B1, #2A3F5F);
             color:#9BFF2E;
         }
+        /* Custom info box styling */
         .info-box {
             background-color: #ffffff; 
             color:#11998e;
@@ -29,11 +36,7 @@ st.markdown("""
             border: 2px solid #654ea3;
             margin-bottom: 10px;
         }
-
-        div[data-testid="stSidebarNav"] + div {
-            position: relative;
-            min-height: 90vh;
-        }
+        /* Footer positioning in sidebar */
         .sidebar-footer {
             position: absolute;
             color:orange;
@@ -46,47 +49,55 @@ st.markdown("""
         }
     </style>""", unsafe_allow_html=True)
 
-# Initialize styler
+# Initialize custom graph styler
 styler = GraphStyler()
 
 
-# Streamlit App UI
 def main():
+    """
+    Main function that runs the Streamlit app
+    Handles file upload and initializes analysis
+    """
+    # Sidebar configuration
     st.sidebar.title("📊 WhatsApp Chat Analyzer")
     uploaded_file = st.sidebar.file_uploader("📂 Upload your WhatsApp Chat (.txt)", type=["txt"])
 
+    # Sidebar footer with creator information
     with st.sidebar:
-        # ... existing sidebar elements ...
-
-        # Add after all other sidebar elements but before main content
         st.markdown("---")
         st.markdown('<div class="sidebar-footer">'
                     '🙏 App created by Bhagwan Jha\n\n'
                     '📧 Contact: bk.jha.3297@gmail.com\n'
-                    '🌐 [GitHub](https://github.com/Bhagwanjha85)'
-
-                    '</div>',
+                    '🌐 [GitHub](https://github.com/Bhagwanjha85)</div>',
                     unsafe_allow_html=True)
 
+    # File processing and analysis trigger
     if uploaded_file:
         data = uploaded_file.getvalue().decode("utf-8")
-        df = preprocessor.preprocess(data)
+        df = preprocessor.preprocess(data)  # Process raw chat data
 
         if not df.empty:
-            display_analysis(df)
+            display_analysis(df)  # Start analysis workflow
         else:
             st.warning("⚠️ No messages found in the uploaded file.")
 
 
 def display_analysis(df):
+    """
+    Controls the main analysis workflow
+    Handles user selection and analysis triggering
+    """
     st.write("### 🔍 Processed Chat Data:")
 
+    # User selection dropdown
     user_list = ["Overall"] + sorted(df["User"].unique().tolist())
     selected_user = st.sidebar.selectbox("👥 Select a User", user_list)
 
     if st.sidebar.button("🔎 Analyze Chat"):
         user_df = df if selected_user == "Overall" else df[df["User"] == selected_user]
-        stats = calculate_statistics(user_df, df)
+        stats = calculate_statistics(user_df, df)  # Calculate key metrics
+
+        # Display results
         display_basic_insights(stats)
         visualize_data(stats, user_df)
         display_advanced_analysis(user_df)
@@ -94,6 +105,10 @@ def display_analysis(df):
 
 
 def calculate_statistics(user_df, df):
+    """
+    Computes various chat statistics
+    Returns dictionary of calculated metrics
+    """
     return {
         "Total Messages": user_df.shape[0],
         "Total Words": count_words(user_df["Message"]),
@@ -104,24 +119,45 @@ def calculate_statistics(user_df, df):
         "Sentiment": get_sentiment(user_df["Message"]),
         "Offensive Words": detect_offensive_words(user_df["Message"]),
         "Top Users": get_top_users(df),
-        "Conversation Starters": get_conversation_starters(df)
+        "Conversation Starters": get_conversation_starters(df),
+        "Last Message Date": get_last_message_date(df),
     }
 
 
 def display_basic_insights(stats):
+    """
+    Displays key statistics in styled info boxes
+    Uses two-column layout for better organization
+    """
     col1, col2 = st.columns(2)
+
+    # for Display total msg. :
     with col1:
         st.markdown(f'<div class="info-box">📨 <b>Total Messages:</b> {stats["Total Messages"]}</div>',
                     unsafe_allow_html=True)
+
+        # for Display total words:
         st.markdown(f'<div class="info-box">✍️ <b>Total Words:</b> {stats["Total Words"]}</div>',
                     unsafe_allow_html=True)
+
+    # for Display how much media msg. shared:
     with col2:
         st.markdown(f'<div class="info-box">📸 <b>Media Messages:</b> {stats["Media Messages"]}</div>',
                     unsafe_allow_html=True)
+
+        # for Display total link share in a group/individually:
         st.markdown(f'<div class="info-box">🔗 <b>Links Shared:</b> {stats["Links Shared"]}</div>',
                     unsafe_allow_html=True)
+
+    # for Display first Message Date:
     st.markdown(f'<div class="info-box">📅 <b>First Message Date:</b> {stats["First Message Date"]}</div>',
                 unsafe_allow_html=True)
+
+    # for Display Last Message Date:
+    st.markdown(f'<div class="info-box">📅 <b>Last Message Date:</b> {stats["Last Message Date"]}</div>',
+                unsafe_allow_html=True)
+
+    # for Display Longest Message :
     st.markdown(f'<div class="info-box">💬 <b>Longest Message:</b> {stats["Longest Message"]}</div>',
                 unsafe_allow_html=True)
 
@@ -134,13 +170,21 @@ def visualize_data(stats, user_df):
     visualize_conversation_starters(stats)
 
 
+# Top 5 active Users Visualization:
 def visualize_top_users(stats):
     st.write("### 🏆 Top 5 Active Users")
-    fig_users = px.bar(stats["Top Users"], x=stats["Top Users"].index, y=stats["Top Users"].values,
-                       labels={'x': 'User', 'y': 'Messages Sent'})
+    top_users = stats["Top Users"].reset_index()
+    top_users.columns = ['User', 'Messages']
+
+    top_users['User'] = top_users['User'].apply(lambda x: str(x).split('\n')[0])
+
+    fig_users = px.bar(top_users, x='User', y='Messages',
+                       labels={'User': 'User', 'Messages': 'Messages Sent'})
+    fig_users.update_xaxes(type='category', tickangle=45)
     st.plotly_chart(styler.style_graph(fig_users, "User", "Messages Sent"))
 
 
+# to display the sentiment analysis of the users
 def visualize_sentiment(stats):
     st.write("### 📊 Sentiment Analysis")
     fig_sentiment = px.bar(x=list(stats["Sentiment"].keys()), y=list(stats["Sentiment"].values()),
@@ -148,6 +192,7 @@ def visualize_sentiment(stats):
     st.plotly_chart(styler.style_graph(fig_sentiment, "Sentiment", "Count"))
 
 
+# to display the most offensive used users
 def visualize_offensive_words(stats, selected_user=None, df=None):
     if stats["Offensive Words"]:
         st.write("### 🚨 Most Used Offensive Words:")
@@ -171,6 +216,8 @@ def visualize_emojis(user_df):
     else:
         st.write("❌ No emojis found in messages!")
 
+
+# to display Who Starts Most Conversations ?
 def visualize_conversation_starters(stats):
     starters = stats["Conversation Starters"]
     if not starters.empty:
@@ -186,6 +233,7 @@ def visualize_conversation_starters(stats):
         st.plotly_chart(fig)
     else:
         st.write("No conversation starters data available.")
+
 
 
 def display_advanced_analysis(user_df):
