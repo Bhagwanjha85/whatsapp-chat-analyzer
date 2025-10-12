@@ -1,355 +1,379 @@
-"""
-Main Streamlit application for WhatsApp Chat Analysis
-Handles UI, file upload, and analysis orchestration
-"""
-
 import streamlit as st
-from matplotlib import pyplot as plt
-import preprocessor
-from helpers import *
-import helpers as helper
-import seaborn as sns
 import pandas as pd
 import plotly.express as px
-from wordcloud import WordCloud
+from preprocessor import preprocess
+from helpers import (
+    GraphStyler,
+    get_top_users,
+    get_sentiment,
+    count_words,
+    count_media_messages,
+    count_links,
+    get_first_message_date,
+    get_last_message_date,
+    create_top_users_bar_chart,
+    create_wordcloud,
+    create_monthly_timeline,
+    create_daily_activity_map,
+    create_daily_messages_bar_chart,
+    create_monthly_day_count_chart,
+    create_monthly_message_count_chart,
+    create_monthly_area_timeline,
+    create_reply_time_analysis,
+    get_toxicity_spam_report,  # NEW IMPORT
+    create_toxicity_spam_chart  # NEW IMPORT
+)
+import zipfile
+import io
 
-# 🎨 Custom CSS styles for the application
-st.markdown("""
-    <style>
-        /* Main app background gradient */
-        .stApp { 
-            background-image: url('https://xmple.com/wallpaper/highlight-black-red-gradient-linear-3840x2160-c2-000000-8b0000-l-67-a-345-f-21.svg'); 
-            color:#ffffff;
-            background-repeat: no-repeat, repeat;
-             background-size: cover;
-             background-position: center;
-        }
-        /* Sidebar styling with gradient */
-        .stSidebar { 
-            background: linear-gradient(155deg, #00C9B1, #2A3F5F);
-            color:white;
-            
-        }
-        /* Custom info box styling */
-        .info-box {
-            background-color: #ffffff; 
-            color:black;
-            padding: 15px;
-            border-radius: 10px; 
-            border: 2px solid #654ea3;
-            margin-bottom: 10px;
-        }
-        /* Footer positioning in sidebar */
-        .sidebar-footer {
-            position:absolute;
-            top:40px;
-            width: 100%;
-            margin-top:54%;
-            text-align:center;
-            padding: 1rem;
-            background-image: url('https://www.kythelmet.com/bg-world.svg'); 
-            color:#ffffff;
-            background-repeat: no-repeat, repeat;
-            background-size: cover;
-            background-position: center;
-            border-radius:10px;
-            color:gold;
-        }
-        .sidebar-footer a{
-         # text-decoration:none;
-         color:white;
-         }
-         
-         
-    </style>""", unsafe_allow_html=True)
+CUSTOM_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+*{
+color:#DCDCDC;
+margin:0px;
+padding:0px;
+}
 
-# Initialize custom graph styler
-styler = GraphStyler()
+body {
+    font-family: 'Poppins', sans-serif;
+    color: #E9EDEF;
+}
+
+.stApp {
+    background-color:#0F1C2E;
+}
+
+.st-emotion-cache-1c7yb1t {
+    margin-bottom: 50px;
+}
+
+.fixed-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: #075E54;
+    color: #E9EDEF;
+    text-align: center;
+    padding: 10px 0;
+    z-index: 1000;
+    box-shadow: 0 -3px 15px rgba(0, 0, 0, 0.4);
+    font-size: 0.9em;
+    transition: all 0.3s ease;
+}
+
+.fixed-footer a {
+    color: #25D366;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.dashboard-card {
+    background-color: #202C33;
+    border-radius: 15px;
+    padding: 20px;
+    margin: 10px 0;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(37, 211, 102, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: default;
+    height: 100%;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 35px rgba(37, 211, 102, 0.3);
+}
+
+.card-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #8696A0;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+}
+
+.card-value {
+    font-size: 2.8em;
+    font-weight: 700;
+    color: #25D366;
+    line-height: 1.2;
+}
+
+.css-1d391kg, .css-1dp549z {
+    background-color: #0A192F !important;
+}
+
+.st-emotion-cache-1ft9j1m h2 {
+    color: #25D366;
+}
+
+.stButton>button {
+    background-color: #075E54;
+    color: white;
+    border-radius: 8px;
+    border: 1px solid #25D366;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.stButton>button:hover {
+    background-color: #008069;
+    transform: scale(1.03);
+}
+
+.stPlotlyChart {
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    margin-top: 20px;
+}
+
+.emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    padding: 10px 0;
+}
+
+.emoji-item {
+    font-size: 1.5em;
+    text-align: center;
+    background-color: #1F2C33;
+    padding: 5px;
+    border-radius: 8px;
+    transition: background-color 0.2s;
+}
+
+.emoji-item:hover {
+    background-color: #304047;
+}
+
+"""
 
 
-def show_detailed_instructions():
-    """Displays comprehensive instructions that auto-hide when file is uploaded"""
+def load_css(css_text):
+    st.markdown(f'<style>{css_text}</style>', unsafe_allow_html=True)
+
+
+def get_chat_data_from_file(uploaded_file):
+    file_type = uploaded_file.name.split('.')[-1].lower()
+
+    if file_type == 'zip':
+        try:
+            with zipfile.ZipFile(uploaded_file, 'r') as z:
+
+                txt_files = [f for f in z.namelist() if f.endswith('.txt')]
+                if not txt_files:
+                    st.error("No WhatsApp chat (.txt) file found inside the ZIP archive.")
+                    return None
+
+                with z.open(txt_files[0]) as f:
+                    return f.read().decode("utf-8")
+        except zipfile.BadZipFile:
+            st.error("The uploaded file is a corrupted or invalid ZIP archive.")
+            return None
+        except UnicodeDecodeError:
+            st.error("Could not decode file inside ZIP. Ensure it is a UTF-8 encoded text file.")
+            return None
+
+    elif file_type == 'txt':
+        try:
+            return uploaded_file.getvalue().decode("utf-8")
+        except UnicodeDecodeError:
+            st.error("Could not decode file. Ensure it is a UTF-8 encoded text file.")
+            return None
+
+    else:
+        st.error("Unsupported file type. Please upload a .txt or .zip file.")
+        return None
+
+
+def main_app():
+    load_css(CUSTOM_CSS)
+
+    st.set_page_config(
+        layout="wide",
+        page_title="WhatsApp Chat Analyzer",
+        initial_sidebar_state="expanded"
+    )
+
+    st.sidebar.title("Configuration and Filters")
+
+    uploaded_file = st.sidebar.file_uploader("Upload WhatsApp Chat (.txt or .zip)", type=["txt", "zip"])
+
+    selected_theme = st.sidebar.selectbox("Select Theme", [
+        "Dark", "Light", "Cyberpunk", "Pastel",
+        "Minimalist", "Jha Look"
+    ])
+
+    styler = GraphStyler()
+    styler.update_theme(selected_theme)
+
+    st.sidebar.markdown("---")
+
+    st.title("WhatsApp Chat Analyzer Dashboard")
+    st.markdown("Upload a file to start the analysis.")
+
+    if uploaded_file is not None:
+
+        raw_data = get_chat_data_from_file(uploaded_file)
+
+        if raw_data is None:
+            return
+
+        df = preprocess(raw_data)
+
+        if df.empty:
+            st.error("No valid WhatsApp chat data found in the uploaded file. Please check the format.")
+            return
+
+        user_list = df['User'].unique().tolist()
+        user_list.sort()
+        user_list.insert(0, "Overall Chat")
+
+        selected_user = st.sidebar.selectbox("Analyze data for:", user_list)
+
+        if selected_user != "Overall Chat":
+            filtered_df = df[df['User'] == selected_user]
+            st.header(f"Analysis for {selected_user}")
+        else:
+            filtered_df = df
+            st.header("Overall Chat Summary")
+
+        st.subheader("Key Metrics")
+        col1, col2, col3, col4 = st.columns(4)
+
+        total_messages = len(filtered_df)
+        total_words = count_words(filtered_df['Message'])
+        media_count = count_media_messages(filtered_df['Message'])
+        link_count = count_links(filtered_df['Message'])
+        first_date = get_first_message_date(df)
+        last_date = get_last_message_date(df)
+
+        with col1:
+            st.markdown(f"""
+                <div class="dashboard-card">
+                    <div class="card-title">Total Messages</div>
+                    <div class="card-value">{total_messages}</div>
+                    <p style="font-size:0.9em; color:#8696A0;">Last Message: {last_date.split(',')[0]}</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            avg_words_per_msg = round(total_words / total_messages, 1) if total_messages else 0
+            st.markdown(f"""
+                <div class="dashboard-card">
+                    <div class="card-title">Total Words</div>
+                    <div class="card-value">{total_words}</div>
+                    <p style="font-size:0.9em; color:#8696A0;">Avg. {avg_words_per_msg} words/msg</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with col3:
+            media_percentage = round(media_count / total_messages * 100, 1) if total_messages else 0
+            st.markdown(f"""
+                <div class="dashboard-card">
+                    <div class="card-title">Media Messages</div>
+                    <div class="card-value">{media_count}</div>
+                    <p style="font-size:0.9em; color:#8696A0;">{media_percentage}% of total</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with col4:
+            st.markdown(f"""
+                <div class="dashboard-card">
+                    <div class="card-title">Links Shared</div>
+                    <div class="card-value">{link_count}</div>
+                    <p style="font-size:0.9em; color:#8696A0;">Started: {first_date.split(',')[0]}</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<h2 style='color:#25D366; margin-top: 30px;'>Graphs and Patterns</h2>", unsafe_allow_html=True)
+
+        st.markdown("---")
+        if selected_user == "Overall Chat":
+            st.subheader("Top Active Users")
+            fig_top_users = create_top_users_bar_chart(filtered_df, styler)
+            st.plotly_chart(fig_top_users, use_container_width=True)
+
+            st.markdown("---")
+            st.subheader("Average Reply Time Analysis")
+            fig_reply_time = create_reply_time_analysis(df, styler)
+            if fig_reply_time:
+                st.plotly_chart(fig_reply_time, use_container_width=True)
+            else:
+                st.info("Reply time analysis requires a chat with at least two active users.")
+
+        else:
+            st.subheader(f"{selected_user}'s Activity Timeline (Line Plot)")
+            fig_timeline = create_monthly_timeline(filtered_df, styler)
+            st.plotly_chart(fig_timeline, use_container_width=True)
+
+            st.markdown("---")
+            st.subheader(f"{selected_user}'s Activity Timeline (Area Plot)")
+            fig_area_timeline = create_monthly_area_timeline(filtered_df, styler)
+            st.plotly_chart(fig_area_timeline, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("Daily Message Activity (Day of Week)")
+        fig_daily_bar = create_daily_messages_bar_chart(filtered_df, styler)
+        st.plotly_chart(fig_daily_bar, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("Message Activity by Month Number (1-12)")
+        fig_monthly_num = create_monthly_message_count_chart(filtered_df, styler)
+        st.plotly_chart(fig_monthly_num, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("Message Activity by Day of Month")
+        fig_monthly_day = create_monthly_day_count_chart(filtered_df, styler)
+        st.plotly_chart(fig_monthly_day, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("Sentiment Summary")
+        sentiment_counts = get_sentiment(filtered_df['Message'])
+        sentiment_df = pd.DataFrame(sentiment_counts.items(), columns=['Sentiment', 'Count'])
+
+        fig_sentiment = px.pie(sentiment_df, values='Count', names='Sentiment',
+                               color_discrete_sequence=['#25D366', '#075E54', '#8696A0'])
+        fig_sentiment.update_traces(textposition='inside', textinfo='percent+label')
+        fig_sentiment = styler.style_graph(fig_sentiment, '', '')
+        fig_sentiment.update_layout(title_text='Sentiment Breakdown')
+        st.plotly_chart(fig_sentiment, use_container_width=True)
+
+        # NEW FEATURE: Toxicity and Spam Report
+        st.markdown("---")
+        st.subheader("Toxicity and Spam Detection Report")
+        toxicity_report = get_toxicity_spam_report(filtered_df['Message'])
+        fig_toxicity = create_toxicity_spam_chart(toxicity_report, styler)
+        st.plotly_chart(fig_toxicity, use_container_width=True)
+        # End of New Feature
+
+        st.markdown("---")
+        st.subheader("Chat Activity Heatmap (Day vs. Hour)")
+        fig_heatmap = create_daily_activity_map(filtered_df, styler)
+        st.plotly_chart(fig_heatmap, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("Word Frequency Analysis")
+
+        st.markdown("##### Most Used Words")
+        wordcloud_img = create_wordcloud(filtered_df['Message'])
+        st.image(wordcloud_img, use_container_width=True, caption="Visual representation of frequent words")
+
+
+    else:
+        st.info("Upload your WhatsApp chat (.txt or .zip) file to begin. Use the 'Export Chat' option on WhatsApp.")
+
     st.markdown("""
-    
+        <div class="fixed-footer">
+            WhatsApp Chat Analyzer | Developed by: Bhagwan Ji Jha
+        </div>
     """, unsafe_allow_html=True)
 
 
-
-def main():
-    """
-    Main function that runs the Streamlit app
-    Handles file upload and initializes analysis
-    """
-
-    # Initialize instructions placeholder
-    instructions_placeholder = st.empty()
-
-    # Show instructions only if no file uploaded
-    if 'uploaded' not in st.session_state:
-        instructions_placeholder.markdown("""
-           <div style='margin-left: 15px;'>
-            <div style='margin: 15px 0;'>
-                <h3 style='color: #00FFFF'>Step 1: Export WhatsApp Chat</h3>
-                <div style='margin-left: 20px;'>
-                    <p><strong>Android/iOS:</strong></p>
-                    <ul>
-                        <li>Open target chat in WhatsApp</li>
-                        <li>Tap ⋮ Menu → More → Export chat</li>
-                        <li>Select <span style='color:orange'>"Without Media"</span> option</li>
-                        <li>Click Ok and <span style='color:#9BFF2E'>"Download the file in your own system"</span> option</li>
-                    </ul>
-                    
-                    
-            </div>
-
-            <div style='margin: 15px 0;'>
-                <h3 style='color: #00FFFF'>Step 2: Upload File</h3>
-                <div style='margin-left: 20px;'>
-                    <ul>
-                        <li>Look for uploader in left sidebar (<span style='color:#eaafc8'>📂 icon</span>)</li>
-                        <li>Select exported .txt file</li>
-                        <li>Wait for file processing (2-10 seconds)</li>
-                    </ul>
-                </div>
-            </div>
-
-            <div style='margin: 15px 0;'>
-                <h3 style='color: #00FFFF'>Step 3: Analyze Chat</h3>
-                <div style='margin-left: 20px;'>
-                    <ul>
-                        <li>Select user from dropdown (or "Overall")</li>
-                        <li>Click <span style='color:#38ef7d'>"🔎 Analyze Chat"</span> button</li>
-                        <li>Scroll to explore visualizations:
-                            <ul>
-                                <li>📈 Message statistics</li>
-                                <li>😀 Emoji usage</li>
-                                <li>📅 Activity patterns</li>
-                                <li>📊 Sentiment analysis</li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.sidebar.title("WHATSAPP CHAT ANALYZER")
-    # File processing and analysis trigger
-    uploaded_file = st.sidebar.file_uploader("📂 Upload your WhatsApp Chat (.txt)", type=["txt"])
-
-    # Sidebar footer with creator information
-    with st.sidebar:
-        st.markdown("---")
-        st.markdown('<div class="sidebar-footer">'
-                    '© Bhagwan Jha @ 2025-26 \n\n'
-                    '(https://github.com/Bhagwanjha85)</div>',
-                    unsafe_allow_html=True)
-    if uploaded_file:
-        # Clear instructions when file is uploaded
-        instructions_placeholder.empty()
-        st.session_state.uploaded = True
-
-        # Rest of your processing code
-        data = uploaded_file.getvalue().decode("utf-8")
-        df = preprocessor.preprocess(data)
-
-        if not df.empty:
-            display_analysis(df)
-        else:
-            st.warning("⚠️ No messages found in the uploaded file.")
-
-
-def display_analysis(df):
-    """
-    Controls the main analysis workflow
-    Handles user selection and analysis triggering
-    """
-    st.write("### 🔍 Processed Chat Data:")
-
-    # User selection dropdown
-    user_list = ["Overall"] + sorted(df["User"].unique().tolist())
-    selected_user = st.sidebar.selectbox("👥 Select a User", user_list)
-
-    if st.sidebar.button("🔎 Analyze Chat"):
-        user_df = df if selected_user == "Overall" else df[df["User"] == selected_user]
-        stats = calculate_statistics(user_df, df)  # Calculate key metrics
-
-        # Display results
-        display_basic_insights(stats)
-        visualize_data(stats, user_df)
-        display_advanced_analysis(user_df)
-        st.success("✅ Analysis Complete!")
-
-
-def calculate_statistics(user_df, df):
-    """
-    Computes various chat statistics
-    Returns dictionary of calculated metrics
-    """
-    return {
-        "Total Messages": user_df.shape[0],
-        "Total Words": count_words(user_df["Message"]),
-        "Media Messages": count_media_messages(user_df["Message"]),
-        "Links Shared": count_links(user_df["Message"]),
-        "First Message Date": get_first_message_date(df),
-        "Longest Message": get_longest_message(user_df["Message"]),
-        "Sentiment": get_sentiment(user_df["Message"]),
-        "Offensive Words": detect_offensive_words(user_df["Message"]),
-        "Top Users": get_top_users(df),
-        "Conversation Starters": get_conversation_starters(df),
-        "Last Message Date": get_last_message_date(df),
-    }
-
-
-def display_basic_insights(stats):
-    """
-    Displays key statistics in styled info boxes
-    Uses two-column layout for better organization
-    """
-    col1, col2 = st.columns(2)
-
-    # for Display total msg. :
-    with col1:
-        st.markdown(f'<div class="info-box">📨 <b>Total Messages:</b> {stats["Total Messages"]}</div>',
-                    unsafe_allow_html=True)
-
-        # for Display total words:
-        st.markdown(f'<div class="info-box">✍️ <b>Total Words:</b> {stats["Total Words"]}</div>',
-                    unsafe_allow_html=True)
-
-    # for Display how much media msg. shared:
-    with col2:
-        st.markdown(f'<div class="info-box">📸 <b>Media Messages:</b> {stats["Media Messages"]}</div>',
-                    unsafe_allow_html=True)
-
-        # for Display total link share in a group/individually:
-        st.markdown(f'<div class="info-box">🔗 <b>Links Shared:</b> {stats["Links Shared"]}</div>',
-                    unsafe_allow_html=True)
-
-    # for Display first Message Date:
-    st.markdown(f'<div class="info-box">📅 <b>First Message Date:</b> {stats["First Message Date"]}</div>',
-                unsafe_allow_html=True)
-
-    # for Display Last Message Date:
-    st.markdown(f'<div class="info-box">📅 <b>Last Message Date:</b> {stats["Last Message Date"]}</div>',
-                unsafe_allow_html=True)
-
-    # for Display Longest Message :
-    st.markdown(f'<div class="info-box">💬 <b>Longest Message:</b> {stats["Longest Message"]}</div>',
-                unsafe_allow_html=True)
-
-
-def visualize_data(stats, user_df):
-    visualize_top_users(stats)
-    visualize_sentiment(stats)
-    visualize_offensive_words(stats)
-    visualize_emojis(user_df)
-    visualize_conversation_starters(stats)
-
-
-# Top 5 active Users Visualization:
-def visualize_top_users(stats):
-    st.write("### 🏆 Top 5 Active Users")
-    top_users = stats["Top Users"].reset_index()
-    top_users.columns = ['User', 'Messages']
-
-    top_users['User'] = top_users['User'].apply(lambda x: str(x).split('\n')[0])
-
-    fig_users = px.bar(top_users, x='User', y='Messages',
-                       labels={'User': 'User', 'Messages': 'Messages Sent'})
-    fig_users.update_xaxes(type='category', tickangle=45)
-    st.plotly_chart(styler.style_graph(fig_users, "User", "Messages Sent"))
-
-
-# to display the sentiment analysis of the users
-def visualize_sentiment(stats):
-    st.write("### 📊 Sentiment Analysis")
-    fig_sentiment = px.bar(x=list(stats["Sentiment"].keys()), y=list(stats["Sentiment"].values()),
-                           labels={'x': 'Sentiment', 'y': 'Count'})
-    st.plotly_chart(styler.style_graph(fig_sentiment, "Sentiment", "Count"))
-
-
-# to display the most offensive used users
-def visualize_offensive_words(stats, selected_user=None, df=None):
-    if stats["Offensive Words"]:
-        st.write("### 🚨 Most Used Offensive Words:")
-        fig_offensive = px.bar(x=list(stats["Offensive Words"].keys()),
-                               y=list(stats["Offensive Words"].values()),
-                               labels={'x': 'Words', 'y': 'Count'})
-        st.plotly_chart(styler.style_graph(fig_offensive, "Words", "Count"))
-    else:
-        st.write("✅ No offensive words detected!")
-
-
-def visualize_emojis(user_df):
-    st.write("### 😀 Most Used Emoji(s)")
-    emoji_counts = extract_emojis(user_df["Message"])
-    if emoji_counts:
-        df_emoji = pd.DataFrame(emoji_counts.items(), columns=["Emoji", "Count"]).nlargest(5, "Count")
-        fig_emoji = px.pie(df_emoji, names="Emoji", values="Count",
-                           color_discrete_sequence=px.colors.sequential.Viridis_r)
-        fig_emoji.update_layout(plot_bgcolor='#0A192F', paper_bgcolor='#1a2f4b', font=dict(color='yellow'))
-        st.plotly_chart(fig_emoji)
-    else:
-        st.write("❌ No emojis found in messages!")
-
-
-# to display Who Starts Most Conversations ?
-def visualize_conversation_starters(stats):
-    starters = stats["Conversation Starters"]
-    if not starters.empty:
-        st.write("### 🚀 Who Starts Most Conversations")
-        fig = px.treemap(starters, path=['User'], values='Count',
-                         color='Count', color_continuous_scale='Teal')
-        fig.update_layout(
-            plot_bgcolor=styler.current_theme["bg"],
-            paper_bgcolor=styler.current_theme["bg"],
-            font=dict(color=styler.current_theme["text"]),
-            margin=dict(t=50, l=25, r=25, b=25)
-        )
-        st.plotly_chart(fig)
-    else:
-        st.write("No conversation starters data available.")
-
-# to display the Most Active Days Per Week according to hrs. and days .
-def display_advanced_analysis(user_df):
-    st.write("### 📅 Most Active Days Per Week")
-    day_counts, day_percentages = analyze_active_days(user_df)
-
-    tab1, tab2 = st.tabs(["Annotated Heatmap", "Radial Distribution"])
-    with tab1:
-        display_heatmap(user_df)
-    with tab2:
-        display_radial_chart(day_counts)
-
-    display_daily_distribution(day_counts, day_percentages)
-
-
-def display_heatmap(user_df):
-    st.write("#### 🔥 Hourly-Daily Activity Heatmap")
-    heatmap_data = user_df.groupby(['day', 'hour']).size().unstack().fillna(0)
-    fig_heat = px.imshow(heatmap_data, labels=dict(x="Hour", y="Day", color="Messages"),
-                         x=heatmap_data.columns, y=heatmap_data.index, color_continuous_scale='RdBu_r', aspect="auto")
-    fig_heat.update_xaxes(side="top")
-    st.plotly_chart(fig_heat)
-
-
-def display_radial_chart(day_counts):
-    st.write("#### 🎯 Activity Radial Distribution")
-    fig_radial = px.line_polar(day_counts.reset_index(), r=day_counts.values, theta='day',
-                               line_close=True, color_discrete_sequence=['#ff6b6b'], template='plotly_dark')
-    fig_radial.update_traces(fill='toself')
-    st.plotly_chart(fig_radial)
-
-
-def display_daily_distribution(day_counts, day_percentages):
-    st.write("#### 📊 Daily Message Distribution")
-    fig_days = px.bar(day_counts, x=day_counts.index, y=day_counts.values,
-                      color=day_percentages.values, color_continuous_scale='Magma',
-                      labels={'x': 'Day', 'y': 'Messages'}, text=day_percentages.apply(lambda x: f'{x}%'))
-    fig_days.add_scatter(x=day_counts.index, y=day_counts.values, mode='lines+markers',
-                         name='Trend', line=dict(color='#38ef7d', width=4))
-    st.plotly_chart(styler.style_graph(fig_days, "Day", "Messages"))
-
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    try:
+        main_app()
+    except Exception as e:
+        st.error(f"An error occurred during application execution: {e}")
