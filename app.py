@@ -29,7 +29,7 @@ import io
 CUSTOM_CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
 *{
-color:#DCDCDC;
+color:gray;
 margin:0px;
 padding:0px;
 }
@@ -52,10 +52,10 @@ body {
     bottom: 0;
     left: 0;
     width: 100%;
-    background-color: #075E54;
+    background-color: green;
     color: #E9EDEF;
     text-align: center;
-    padding: 10px 0;
+    padding: 6px 0;
     z-index: 1000;
     box-shadow: 0 -3px 15px rgba(0, 0, 0, 0.4);
     font-size: 0.9em;

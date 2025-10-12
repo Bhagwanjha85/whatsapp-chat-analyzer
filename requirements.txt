@@ -2,10 +2,8 @@ streamlit
 matplotlib
 seaborn
 emoji==2.8.0
-emoji
 pandas
 plotly
 wordcloud
 wordCloud
 textblob
-
