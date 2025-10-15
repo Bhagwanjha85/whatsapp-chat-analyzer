@@ -1,4 +1,4 @@
-# whatsapp chat analyzer
+# AI Based whatsapp chat analyzer
 
 **WhatsApp Chat Analyzer is a data visualization and analysis tools built with **python** that helps users dive deeper and understand their WhatsApp chat. By just uploading an exported chat file, users can visualize important communication patterns, discover your most active times date wise and gain insight into your chat habits. The app is designed with simplicity and interactivity in mind, making it available even for non-technical users who want to see their chat statistics in a fun and informative way.**
 
